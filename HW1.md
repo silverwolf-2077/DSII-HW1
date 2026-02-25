@@ -49,7 +49,7 @@ housing_test =
 
 # a
 
-1)  Fit a lasso model on the training data.
+- Fit a lasso model on the training data.
 
 ``` r
 ctrl1 = trainControl(method = "cv", number = 10)
@@ -61,28 +61,26 @@ lasso.fit = train(sale_price ~ .,
                   tuneGrid = expand.grid(alpha = 1, 
                                          lambda = exp(seq(8, 2, length = 100))),
                   trControl = ctrl1)
-```
 
-2)  Report the selected tuning parameter and the test error.
-
-``` r
 plot(lasso.fit, xTrans = log)
 ```
 
-![](HW1_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](HW1_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+
+- Report the selected tuning parameter and the test error.
 
 ``` r
-lasso_lambda = lasso.fit$bestTune$lambda
+lasso_lambda_min = lasso.fit$bestTune$lambda
 
 lasso.pred = predict(lasso.fit, newdata = housing_test)
-test_mse = mean((lasso.pred - housing_test[["sale_price"]])^2)
+lasso_test_mse = mean((lasso.pred - housing_test[["sale_price"]])^2)
 ```
 
-The selected tuning parameter is 65.4848083, and the test error is
-4.3996792^{8}.
+*The selected lambda is 65.4848083, and the test error is
+4.3996792^{8}.*
 
-3)  When the 1SE rule is applied, how many predictors are included in
-    the model?
+- When the 1SE rule is applied, how many predictors are included in the
+  model?
 
 ``` r
 ctrl_1se = trainControl(method = "cv",
@@ -145,7 +143,46 @@ lasso_1se_coef
     ## misc_val                    .           
     ## year_sold                   .
 
-Under the 1SE rule, the model includes 29 predictors.
+*Under the 1SE rule, the model includes 29 predictors.*
+
+# b
+
+- Fit an elastic net model on the training data.
+
+``` r
+set.seed(2026)
+enet.fit = train(sale_price ~ .,
+                 data = housing_train,
+                 method = "glmnet",
+                 tuneGrid = expand.grid(alpha = seq(0, 1, length = 21),
+                                        lambda = exp(seq(10, 2, length = 100))),
+                 trControl = ctrl1)
+
+myCol = rainbow(25)
+myPar = list(superpose.symbol = list(col = myCol),
+             superpose.line = list(col = myCol))
+
+plot(enet.fit, par.settings = myPar, xTrans = log)
+```
+
+![](HW1_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+- Report the selected tuning parameters and the test error.
+
+``` r
+enet_alpha = enet.fit$bestTune$alpha
+enet_lambda_min = enet.fit$bestTune$lambda
+
+enet.pred = predict(enet.fit, newdata = housing_test)
+enet_test_mse = mean((enet.pred - housing_test[["sale_price"]])^2)
+```
+
+*The selected talpha is 0.05, lambda is 629.1970259, and the test error
+is 4.381072^{8}.*
+
+- Is it possible to apply the 1SE rule to select the tuning parameters
+  for elastic net? If the 1SE rule is applicable, implement it to select
+  the tuning parameters. If not, explain why.
 
 # e
 
@@ -169,7 +206,7 @@ cv.lasso = cv.glmnet(x, y,
 plot(cv.lasso)
 ```
 
-![](HW1_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](HW1_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ``` r
 cv.lasso$lambda.min
