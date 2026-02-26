@@ -53,7 +53,9 @@ housing_test =
 - Fit a lasso model on the training data.
 
 ``` r
-ctrl1 = trainControl(method = "cv", number = 10)
+ctrl1 = trainControl(method = "cv", 
+                     number = 10,
+                     selectionFunction = "best")
 
 set.seed(2026)
 lasso.fit = train(sale_price ~ .,
@@ -84,9 +86,9 @@ lasso_test_mse = mean((lasso.pred - housing_test[["sale_price"]])^2)
   model?
 
 ``` r
-ctrl_1se = trainControl(method = "cv",
-                        number = 10,
-                        selectionFunction = "oneSE")
+ctrl_1se = trainControl(method = "cv", 
+                     number = 10,
+                     selectionFunction = "oneSE")
 
 set.seed(2026)
 lasso_1se.fit = train(sale_price ~ .,
@@ -290,20 +292,18 @@ response, because it achieves the lowest cross-validated RMSE.*
 # e
 
 - If R package “caret” was used for the lasso in (a), retrain this model
-  using R package “glmnet”, and vice versa. Compare the selected tuning
-  parameters between the two software approaches. Should there be
-  discrepancies in the chosen parameters, discuss potential reasons for
-  these differences.
+  using R package “glmnet”, and vice versa.
 
 ``` r
-x = model.matrix(sale_price ~ ., housing_train)[,-1]
-y = housing_train[["sale_price"]]
-
 set.seed(2026)
 cv.lasso = cv.glmnet(x, y, 
                      alpha = 1,
                      lambda = exp(seq(8, 2, length = 100)))
 ```
+
+- Compare the selected tuning parameters between the two software
+  approaches. Should there be discrepancies in the chosen parameters,
+  discuss potential reasons for these differences.
 
 ``` r
 plot(cv.lasso)
@@ -318,48 +318,20 @@ cv.lasso$lambda.min
     ## [1] 69.57632
 
 ``` r
-predict(cv.lasso, s = "lambda.1se", type = "coefficients")
+cv.lasso$lambda.1se
 ```
 
-    ## 40 x 1 sparse Matrix of class "dgCMatrix"
-    ##                               lambda.1se
-    ## (Intercept)                -5.985566e+05
-    ## gr_liv_area                 5.345124e+01
-    ## first_flr_sf                1.395202e+00
-    ## second_flr_sf               .           
-    ## total_bsmt_sf               3.661138e+01
-    ## low_qual_fin_sf            -1.728760e+01
-    ## wood_deck_sf                7.418817e+00
-    ## open_porch_sf               5.075802e+00
-    ## bsmt_unf_sf                -1.763644e+01
-    ## mas_vnr_area                1.463194e+01
-    ## garage_cars                 3.275265e+03
-    ## garage_area                 1.198837e+01
-    ## year_built                  3.255182e+02
-    ## tot_rms_abv_grd             .           
-    ## full_bath                   .           
-    ## overall_qualAverage        -2.385355e+03
-    ## overall_qualBelow_Average  -7.499860e+03
-    ## overall_qualExcellent       8.668954e+04
-    ## overall_qualFair           -3.321366e+03
-    ## overall_qualGood            8.238395e+03
-    ## overall_qualVery_Excellent  1.546285e+05
-    ## overall_qualVery_Good       3.395035e+04
-    ## kitchen_qualFair           -2.644824e+03
-    ## kitchen_qualGood            .           
-    ## kitchen_qualTypical        -9.956713e+03
-    ## fireplaces                  7.110463e+03
-    ## fireplace_quFair            .           
-    ## fireplace_quGood            3.846354e+03
-    ## fireplace_quNo_Fireplace    .           
-    ## fireplace_quPoor            .           
-    ## fireplace_quTypical         .           
-    ## exter_qualFair             -1.226437e+04
-    ## exter_qualGood              .           
-    ## exter_qualTypical          -5.765815e+03
-    ## lot_frontage                5.205945e+01
-    ## lot_area                    5.098712e-01
-    ## longitude                   .           
-    ## latitude                    .           
-    ## misc_val                    .           
-    ## year_sold                   .
+    ## [1] 1276.038
+
+*The selected lambda.min for caret is 65.4848083, while for glmnet is
+69.5763174. The lambda.1se for caret is 942.451867, while for glmnet is
+1276.037882.*
+
+*These discrepancies are expected because caret and glmnet implement
+cross-validation differently. Although the same lambda grid was used,
+the two functions generate folds independently and compute
+cross-validated errors and their variability using different internal
+procedures. Since both lambda.min and lambda.1se depend on the estimated
+cross-validation error curve and its standard error, even small
+differences in fold assignment and error aggregation can lead to
+different selected tuning parameters.*

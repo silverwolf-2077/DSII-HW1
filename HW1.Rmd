@@ -2,7 +2,7 @@
 title: "DS HW1"
 author: "Ruihan Ding"
 date: "2026-02-25"
-output: github_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -39,7 +39,9 @@ housing_test =
 * Fit a lasso model on the training data.
 
 ```{r}
-ctrl1 = trainControl(method = "cv", number = 10)
+ctrl1 = trainControl(method = "cv", 
+                     number = 10,
+                     selectionFunction = "best")
 
 set.seed(2026)
 lasso.fit = train(sale_price ~ .,
@@ -66,9 +68,9 @@ _The selected lambda is `r lasso_lambda_min`, and the test error is `r lasso_tes
 * When the 1SE rule is applied, how many predictors are included in the model?
 
 ```{r}
-ctrl_1se = trainControl(method = "cv",
-                        number = 10,
-                        selectionFunction = "oneSE")
+ctrl_1se = trainControl(method = "cv", 
+                     number = 10,
+                     selectionFunction = "oneSE")
 
 set.seed(2026)
 lasso_1se.fit = train(sale_price ~ .,
@@ -164,7 +166,7 @@ _The test error is `r pls_test_mse`._
 ggplot(pls_fit, highlight = TRUE)
 ```
 
-_There are 12 components in my model._
+_There are `r pls_fit$bestTune$ncomp` components in my model._
 
 # d
 
@@ -180,27 +182,26 @@ _Partial least squares model is the best choice for predicting the response, bec
 
 # e
 
-* If R package “caret” was used for the lasso in (a), retrain this model using R package “glmnet”, and vice versa. Compare the selected tuning parameters between the two software approaches. Should there be discrepancies in the chosen parameters, discuss potential reasons for these differences.
+* If R package “caret” was used for the lasso in (a), retrain this model using R package “glmnet”, and vice versa.
 
 ```{r}
-x = model.matrix(sale_price ~ ., housing_train)[,-1]
-y = housing_train[["sale_price"]]
-
 set.seed(2026)
 cv.lasso = cv.glmnet(x, y, 
                      alpha = 1,
                      lambda = exp(seq(8, 2, length = 100)))
 ```
 
+* Compare the selected tuning parameters between the two software approaches. Should there be discrepancies in the chosen parameters, discuss potential reasons for these differences.
+
 ```{r}
 plot(cv.lasso)
 cv.lasso$lambda.min
+cv.lasso$lambda.1se
 ```
 
-```{r}
-predict(cv.lasso, s = "lambda.1se", type = "coefficients")
-```
+_The selected lambda.min for caret is `r lasso_lambda_min`, while for glmnet is `r cv.lasso$lambda.min`. The lambda.1se for caret is `r lasso_1se`, while for glmnet is `r cv.lasso$lambda.1se`._
 
+_These discrepancies are expected because caret and glmnet implement cross-validation differently. Although the same lambda grid was used, the two functions generate folds independently and compute cross-validated errors and their variability using different internal procedures. Since both lambda.min and lambda.1se depend on the estimated cross-validation error curve and its standard error, even small differences in fold assignment and error aggregation can lead to different selected tuning parameters._
 
 
 
