@@ -13,6 +13,7 @@ library(ggplot2)
 library(plotmo)
 library(ggrepel)
 library(tidyverse)
+library(pls)
 ```
 
 Import the data.
@@ -170,6 +171,13 @@ plot(enet.fit, par.settings = myPar, xTrans = log)
 - Report the selected tuning parameters and the test error.
 
 ``` r
+enet.fit$bestTune
+```
+
+    ##     alpha  lambda
+    ## 156  0.05 629.197
+
+``` r
 enet_alpha = enet.fit$bestTune$alpha
 enet_lambda_min = enet.fit$bestTune$lambda
 
@@ -177,20 +185,115 @@ enet.pred = predict(enet.fit, newdata = housing_test)
 enet_test_mse = mean((enet.pred - housing_test[["sale_price"]])^2)
 ```
 
-*The selected talpha is 0.05, lambda is 629.1970259, and the test error
+*The selected alpha is 0.05, lambda is 629.1970259, and the test error
 is 4.381072^{8}.*
 
 - Is it possible to apply the 1SE rule to select the tuning parameters
   for elastic net? If the 1SE rule is applicable, implement it to select
   the tuning parameters. If not, explain why.
 
+``` r
+set.seed(2026)
+enet_1se.fit = train(sale_price ~ .,
+                     data = housing_train,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = enet_alpha,
+                                            lambda = exp(seq(10, 2, length = 100))),
+                     trControl = ctrl_1se)
+
+enet_1se = enet_1se.fit$bestTune$lambda
+```
+
+*Based on the previously selected optimal alpha = 0.05, I applied the
+1SE rule to determine lambda, which is 7105.9438067.*
+
+# c
+
+- Fit a partial least squares model on the training data and report the
+  test error.
+
+``` r
+x = model.matrix(sale_price ~ ., housing_train)[, -1]
+y = housing_train[["sale_price"]]
+
+x2 = model.matrix(sale_price ~ ., housing_test)[, -1]
+y2 = housing_test[["sale_price"]]
+
+set.seed(2026)
+pls_fit = train(x, y,
+                method = "pls",
+                tuneGrid = data.frame(ncomp = 1:19),
+                trControl = ctrl1,
+                preProcess = c("center", "scale"))
+
+predy_pls = predict(pls_fit, newdata = x2)
+pls_test_mse = mean((y2 - predy_pls)^2)
+```
+
+*The test error is 4.4962272^{8}.*
+
+- How many components are included in your model?
+
+``` r
+ggplot(pls_fit, highlight = TRUE)
+```
+
+![](HW1_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+*There are 12 components in my model.*
+
+# d
+
+- Choose the best model for predicting the response and explain your
+  choice.
+
+``` r
+resamp = resamples(list(lasso = lasso.fit, lasso_1se = lasso_1se.fit, enet = enet.fit, enet_1se = enet_1se.fit, pls = pls_fit))
+
+summary(resamp)
+```
+
+    ## 
+    ## Call:
+    ## summary.resamples(object = resamp)
+    ## 
+    ## Models: lasso, lasso_1se, enet, enet_1se, pls 
+    ## Number of resamples: 10 
+    ## 
+    ## MAE 
+    ##               Min.  1st Qu.   Median     Mean  3rd Qu.     Max. NA's
+    ## lasso     14767.34 16239.16 16549.68 16668.63 17386.11 18238.66    0
+    ## lasso_1se 15033.07 16138.48 16639.94 16885.36 17969.81 18574.42    0
+    ## enet      14738.00 16197.92 16513.52 16639.35 17367.60 18182.56    0
+    ## enet_1se  14874.30 16280.09 16636.11 16818.23 17745.68 18166.41    0
+    ## pls       14893.35 16234.26 16664.76 16712.82 17444.65 18244.49    0
+    ## 
+    ## RMSE 
+    ##               Min.  1st Qu.   Median     Mean  3rd Qu.     Max. NA's
+    ## lasso     20061.98 21746.27 22975.06 23176.81 24580.80 28303.85    0
+    ## lasso_1se 20664.02 21951.74 23537.46 23940.75 25205.61 30682.77    0
+    ## enet      20039.62 21714.28 23015.51 23166.35 24604.52 28258.98    0
+    ## enet_1se  20815.36 22069.64 23505.00 23900.49 24661.24 30952.67    0
+    ## pls       20051.99 21777.34 23017.97 23145.53 24573.40 27804.33    0
+    ## 
+    ## Rsquared 
+    ##                Min.   1st Qu.    Median      Mean   3rd Qu.      Max. NA's
+    ## lasso     0.8705812 0.8851274 0.9075688 0.9016793 0.9169088 0.9263271    0
+    ## lasso_1se 0.8667812 0.8758247 0.9030785 0.8954890 0.9098742 0.9258259    0
+    ## enet      0.8707239 0.8849025 0.9075583 0.9018122 0.9167978 0.9261045    0
+    ## enet_1se  0.8691088 0.8777841 0.9015654 0.8966101 0.9108552 0.9239632    0
+    ## pls       0.8693941 0.8855808 0.9074139 0.9018073 0.9168251 0.9257025    0
+
+*Partial least squares model is the best choice for predicting the
+response, because it achieves the lowest cross-validated RMSE.*
+
 # e
 
-If R package “caret” was used for the lasso in (a), retrain this model
-using R package “glmnet”, and vice versa. Compare the selected tuning
-parameters between the two software approaches. Should there be
-discrepancies in the chosen parameters, discuss potential reasons for
-these differences.
+- If R package “caret” was used for the lasso in (a), retrain this model
+  using R package “glmnet”, and vice versa. Compare the selected tuning
+  parameters between the two software approaches. Should there be
+  discrepancies in the chosen parameters, discuss potential reasons for
+  these differences.
 
 ``` r
 x = model.matrix(sale_price ~ ., housing_train)[,-1]
@@ -206,7 +309,7 @@ cv.lasso = cv.glmnet(x, y,
 plot(cv.lasso)
 ```
 
-![](HW1_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](HW1_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ``` r
 cv.lasso$lambda.min

@@ -19,6 +19,7 @@ library(ggplot2)
 library(plotmo)
 library(ggrepel)
 library(tidyverse)
+library(pls)
 ```
 
 Import the data.
@@ -107,6 +108,7 @@ plot(enet.fit, par.settings = myPar, xTrans = log)
 * Report the selected tuning parameters and the test error.
 
 ```{r}
+enet.fit$bestTune
 enet_alpha = enet.fit$bestTune$alpha
 enet_lambda_min = enet.fit$bestTune$lambda
 
@@ -114,21 +116,71 @@ enet.pred = predict(enet.fit, newdata = housing_test)
 enet_test_mse = mean((enet.pred - housing_test[["sale_price"]])^2)
 ```
 
-_The selected talpha is `r enet_alpha`, lambda is `r enet_lambda_min`, and the test error is `r enet_test_mse`._
+_The selected alpha is `r enet_alpha`, lambda is `r enet_lambda_min`, and the test error is `r enet_test_mse`._
 
 * Is it possible to apply the 1SE rule to select the tuning parameters for elastic net? If the 1SE rule is applicable, implement it to select the tuning parameters. If not, explain why.
 
+```{r}
+set.seed(2026)
+enet_1se.fit = train(sale_price ~ .,
+                     data = housing_train,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = enet_alpha,
+                                            lambda = exp(seq(10, 2, length = 100))),
+                     trControl = ctrl_1se)
 
+enet_1se = enet_1se.fit$bestTune$lambda
+```
 
+_Based on the previously selected optimal alpha = `r enet_alpha`, I applied the 1SE rule to determine lambda, which is `r enet_1se`._
 
+# c
 
+* Fit a partial least squares model on the training data and report the test error. 
 
+```{r}
+x = model.matrix(sale_price ~ ., housing_train)[, -1]
+y = housing_train[["sale_price"]]
 
+x2 = model.matrix(sale_price ~ ., housing_test)[, -1]
+y2 = housing_test[["sale_price"]]
 
+set.seed(2026)
+pls_fit = train(x, y,
+                method = "pls",
+                tuneGrid = data.frame(ncomp = 1:19),
+                trControl = ctrl1,
+                preProcess = c("center", "scale"))
+
+predy_pls = predict(pls_fit, newdata = x2)
+pls_test_mse = mean((y2 - predy_pls)^2)
+```
+
+_The test error is `r pls_test_mse`._
+
+* How many components are included in your model?
+
+```{r}
+ggplot(pls_fit, highlight = TRUE)
+```
+
+_There are 12 components in my model._
+
+# d
+
+* Choose the best model for predicting the response and explain your choice.
+
+```{r}
+resamp = resamples(list(lasso = lasso.fit, lasso_1se = lasso_1se.fit, enet = enet.fit, enet_1se = enet_1se.fit, pls = pls_fit))
+
+summary(resamp)
+```
+
+_Partial least squares model is the best choice for predicting the response, because it achieves the lowest cross-validated RMSE._
 
 # e
 
-If R package “caret” was used for the lasso in (a), retrain this model using R package “glmnet”, and vice versa. Compare the selected tuning parameters between the two software approaches. Should there be discrepancies in the chosen parameters, discuss potential reasons for these differences.
+* If R package “caret” was used for the lasso in (a), retrain this model using R package “glmnet”, and vice versa. Compare the selected tuning parameters between the two software approaches. Should there be discrepancies in the chosen parameters, discuss potential reasons for these differences.
 
 ```{r}
 x = model.matrix(sale_price ~ ., housing_train)[,-1]
